@@ -57,7 +57,11 @@ runabSearch :: Board -> PruneConfig -> Maybe Decision
 runabSearch b c = runAI c (absearch b)
 
 
-data Decision = Ended Color | Next Board deriving Show
+data Decision = Ended Color | Next Board 
+
+instance Show Decision where
+  show (Next b) = "Next:\n" ++ show b
+  show (Ended c) = show c ++ " wins!\n"
 
 --mmsearch :: Board -> AI Decision
 

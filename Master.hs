@@ -9,7 +9,14 @@ import qualified Data.Set as Set
 basicCutoff :: Int -> Cutoff
 basicCutoff _ _ (EndGame _) = True
 basicCutoff x b _
-  | roundNumber b < x = False
+  | roundNumber b <= x = False
+  | otherwise = True
+
+nojumpCutoff :: Int -> Cutoff
+nojumpCutoff _ _ (EndGame _) = True
+nojumpCutoff x b (Ongoing (h:_)) 
+  | roundNumber b <= x = False
+  | Set.size (pieces b) > Set.size (pieces h) = False
   | otherwise = True
 
 basicEval :: Eval
@@ -27,17 +34,22 @@ kingEval b = Set.foldl f 0 (pieces b)
 minmax :: Int ->  Board -> Decision
 minmax x b = fromJust $ runabSearch b (True, basicCutoff x, kingEval) 
 
+alphabeta :: Int -> Board -> Decision
+alphabeta x b = fromJust $ runabSearch b (True, nojumpCutoff x, kingEval)
+
+
 main ::  IO ()
 main = do
-  h <- openFile "test5" ReadMode
+--  h <- openFile "test5" ReadMode
+  let h = stdin
   x <- fmap read $ hGetLine h
   putStrLn $ "Cutoff at " ++ show x ++ "\n"
   b <-  hGetLine h
   pcs <- fmap (map makePiece . lines) $ hGetContents h
   let bo = makeBoard b pcs
   print bo
-  let d = minmax x bo 
+  let d = alphabeta x bo 
 --  print $ expand bo
   putStrLn "----------------"
   --putStrLn $ Text.unpack . snd $ d
-  print $ d
+  print  d

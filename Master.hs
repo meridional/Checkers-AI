@@ -31,6 +31,7 @@ main ::  IO ()
 main = do
   h <- openFile "test5" ReadMode
   x <- fmap read $ hGetLine h
+  putStrLn $ "Cutoff at " ++ show x ++ "\n"
   b <-  hGetLine h
   pcs <- fmap (map makePiece . lines) $ hGetContents h
   let bo = makeBoard b pcs

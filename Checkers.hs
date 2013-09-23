@@ -1,6 +1,6 @@
 module Checkers where
 
-import Control.Concurrent
+--import Control.Concurrent
 import Control.Monad.Reader
 import Data.Maybe
 import Data.List (find, intersperse , sortBy)

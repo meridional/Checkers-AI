@@ -2,7 +2,7 @@ module Checkers where
 
 --import Control.Concurrent
 import Control.Monad.Reader
-import Data.Maybe
+--import Data.Maybe
 import Data.List (find, intersperse , sortBy)
 import qualified Data.Set as Set
 import System.IO
@@ -32,7 +32,8 @@ instance Ord Piece where
 
 
 data Board = Board {
-    pieces :: Set.Set Piece
+    redps :: Set.Set Piece
+  , blackps :: Set.Set Piece
   , playing :: Color
   , roundNumber :: Int
   } 
@@ -41,7 +42,7 @@ instance Show Board where
   show b = let fstLine = " 12345678"
              in unlines . map (intersperse ' ') $ fstLine : map format [1..8]
      where
-      pcs = Set.toList $ pieces b
+      pcs = Set.toList (redps b) ++ Set.toList (blackps b)
       format n = show n ++ map (format' n) [1..8]
       format' y x = case find (\p -> pos p == (x,y)) pcs of
                          Just k -> piece2Char k
@@ -54,15 +55,21 @@ piece2Char (King _ Black) = 'B'
 piece2Char (King _ Red) = 'R'
 
 flipBoard :: Board -> Board
-flipBoard (Board p c r) = Board p (adv c) (r+1)
+flipBoard (Board rp bp c r) = Board rp bp (adv c) (r+1)
 
 adv :: Color -> Color
 adv Red = Black
 adv Black = Red
 
 playingPieces :: Board -> Set.Set Piece
-playingPieces b = Set.filter (\p -> color p == playing b) (pieces b)
+playingPieces b
+  | playing b == Red = redps b
+  | otherwise = blackps b
 
+opposingPieces :: Board -> Set.Set Piece
+opposingPieces b
+  | playing b == Black = redps b
+  | otherwise = blackps b
 type Move = [Tile]
 
 data Report = EndGame Color | Ongoing [Board] deriving (Show)
@@ -95,22 +102,22 @@ backwardSteps :: Tile -> [Tile]
 backwardSteps (x,y) = filter onTheBoard [(x+1,y-1),(x-1,y-1)]
 
 deletePiece :: Piece -> Board -> Board
-deletePiece p (Board pcs ping r) = Board (Set.delete p pcs) ping r
+deletePiece p (Board rp bp c r) 
+  | color p == Red = Board (Set.delete p rp) bp c r
+  | otherwise = Board rp (Set.delete p bp) c r
 
-occupied :: Tile -> Board -> Maybe Color
-occupied t b = do
-  p <- Set.lookupLE (genericPieceOnTile t) pcs
-  if pos p == t then return (color p)
-                else Nothing
-  where pcs = pieces b
-  
 
-emptyTile :: Board -> Tile -> Bool
-emptyTile b t = isNothing $ occupied t b 
+emptyTile :: Board -> Piece -> Bool
+emptyTile b p
+  | color p == Red = p `Set.notMember` redps b
+  | otherwise = p `Set.notMember` blackps b
+
+emptyTile' :: Board -> Tile -> Bool
+emptyTile' b t = emptyTile b (genericPieceOnTile t Red) && emptyTile b (genericPieceOnTile t Black)
 
 paces :: Piece -> Board -> [Board]
 paces p b = do
-  t <- filter (emptyTile b) $ neighboringSteps p
+  t <- filter (emptyTile' b) $ neighboringSteps p
   return $ commitPace p t b
 
 changePos :: Piece -> Tile -> Piece
@@ -136,43 +143,47 @@ kinged (Pawn _ Red) (_, 8) = True
 kinged _ _ = False
 
 jumps :: Piece -> Board -> [Board]
-jumps p b@(Board pcs c r) = do
+jumps p b = do
   (t1, t2) <- filter (canJump b) (possibleJumps p)
-  let newB = Board (Set.delete (genericPieceOnTile t1) pcs) c r
+  let newB = deletePiece (genericPieceOnTile t1 (adv $ color p)) b 
       newP = changePos p t2
   if kinged p t2 then return (putBack newP newB)
                  else jumps' newP newB
 
 putBack :: Piece -> Board -> Board
-putBack p (Board pcs c r) = Board (Set.insert p pcs) c r
+putBack p (Board rp bp c r)
+  | color p == Red = Board (Set.insert p rp) bp c r
+  | otherwise = Board rp (Set.insert p bp) c r
 
 deleteBy :: (a -> Bool) -> [a] -> [a]
 deleteBy _ [] = []
 deleteBy f (a:rest) = if f a then rest else a : deleteBy f rest
 
-genericPieceOnTile :: Tile -> Piece
-genericPieceOnTile t = Pawn t Red
+genericPieceOnTile :: Tile -> Color -> Piece
+genericPieceOnTile = Pawn 
 
 jumps' :: Piece -> Board -> [Board]
-jumps' p b@(Board pcs c r) = let js = filter (canJump b) (possibleJumps p)
+jumps' p b = let js = filter (canJump b) (possibleJumps p)
                              in if null js then return (putBack p b)
                                            else do
                                              (t1,t2) <- js;
-                                             let newB = Board (Set.delete (genericPieceOnTile t1) pcs) c r
+                                             let newB = deletePiece (genericPieceOnTile t1 (adv $ color p)) b
                                                  newP = changePos p t2
                                              if kinged p t2 then return (putBack newP newB)
                                                             else jumps' newP newB
 
 canJump :: Board -> Jump -> Bool
-canJump b@(Board _ c _) (t1, t2) = occupied t1 b == Just (adv c) && emptyTile b t2
+canJump b (t1, t2)
+  | playing b == Red = not (emptyTile b (genericPieceOnTile t1 Black)) && emptyTile' b t2
+  | otherwise = not (emptyTile b (genericPieceOnTile t1 Red)) && emptyTile' b t2
 
 next :: GameMechanics Report
 next = do
   pcs <- asks (playingPieces . board)
   b <- asks board
   let deletedPair = map (\p -> (p, deletePiece p b)) (Set.toList pcs)
-      js = concatMap (\(p,ns) -> jumps p ns) deletedPair
-      ps = concatMap (\(p,ns) -> paces p ns) deletedPair
+      js = concatMap (uncurry jumps) deletedPair
+      ps = concatMap (uncurry paces) deletedPair
   merge js ps
   where
     liftAndSort = return . Ongoing . map flipBoard -- . sortBy (comparing ( Set.size . pieces))
@@ -183,8 +194,10 @@ next = do
 
 
 makeBoard :: String -> [Piece] -> Board
-makeBoard p pcsL = Board (Set.fromList pcsL) pp 1
+makeBoard p pcsL = Board (Set.fromList redPiece) (Set.fromList blackPiece) pp 1
   where pp = if head p == 'R' then Red else Black
+        redPiece = filter (\x -> color x == Red) pcsL
+        blackPiece =filter (\x -> color x == Black) pcsL 
 
 makePiece :: String -> Piece
 makePiece s = let cs:k:x:y:_ = words s

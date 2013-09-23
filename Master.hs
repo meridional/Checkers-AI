@@ -16,16 +16,16 @@ nojumpCutoff :: Int -> Cutoff
 nojumpCutoff _ _ (EndGame _) = True
 nojumpCutoff x b (Ongoing (h:_)) 
   | roundNumber b <= x = False
-  | Set.size (pieces b) > Set.size (pieces h) = False
+  | Set.size (playingPieces b) > Set.size (playingPieces h) = False
   | otherwise = True
 
 basicEval :: Eval
 basicEval b = Set.size r - Set.size bl
-  where r = Set.filter (\x -> color x == Red) (pieces b)
-        bl = Set.filter (\x -> color x == Black) (pieces b)
+  where r =  redps b
+        bl = blackps b
 
 kingEval :: Eval
-kingEval b = Set.foldl f 0 (pieces b)
+kingEval b = Set.foldl f 0 (redps b) + Set.foldl f 0 (blackps b)
   where f a (King _ Black) = a - 5
         f a (King _ _) = a + 5
         f a (Pawn _ Black) = a - 1

@@ -16,7 +16,7 @@ nojumpCutoff :: Int -> Cutoff
 nojumpCutoff _ _ (EndGame _) = True
 nojumpCutoff x b (Ongoing (h:_)) 
   | roundNumber b <= x = False
-  | Set.size (playingPieces b) > Set.size (playingPieces h) = False
+  | Set.size (opposingPieces b) > Set.size (playingPieces h) = False
   | otherwise = True
 
 basicEval :: Eval

@@ -1,11 +1,13 @@
 {-# LANGUAGE  OverloadedStrings #-}
 module AlphaBeta where
 
-import qualified Data.Text.Lazy as Text
+--import qualified Data.Text.Lazy as Text
 import Checkers
-import Control.Monad.State
-import Control.Monad.Writer.Lazy
+import Control.Monad.State.Strict
 import Control.Monad.Reader
+import Data.Monoid
+import Control.Monad.Error
+--import Control.Monad.Maybe
 
 type Score = Int
 
@@ -17,7 +19,7 @@ alpha = fst
 beta :: AIState -> Score
 beta = snd
 
-type AI a =  ReaderT PruneConfig Maybe a
+type AI a = StateT (Sum Int) (ReaderT PruneConfig (ErrorT String IO)) a -- recording total number of nodes visited
 
 inf :: Score
 inf = 99999
@@ -42,18 +44,20 @@ evalfun = asks (\(_,_,e) -> e)
 cutofffun ::  AI Cutoff 
 cutofffun = asks (\(_,f,_) -> f)
 
-type Log a = (a, Text.Text)
+type Log a = (a, Int)
 
-getLog :: Log a -> Text.Text
+getLog :: Log a -> Int
 getLog = snd
 
 getValue :: Log a -> a
 getValue = fst
 
-runAI :: PruneConfig -> AI a -> Maybe a
-runAI config x =  runReaderT x config
+--runAI :: PruneConfig -> AI a -> Maybe (a, Sum Int)
+runAI :: Num a1 =>r-> StateT (Sum a1) (ReaderT r (ErrorT e m)) a-> m (Either e (a, Sum a1))
+runAI config x =  runErrorT $ runReaderT (runStateT x (Sum 0)) config
 
-runabSearch :: Board -> PruneConfig -> Maybe Decision
+--runabSearch :: Board -> PruneConfig -> Maybe (Decision, Sum Int)
+runabSearch :: Board -> PruneConfig -> IO (Either String (Decision, Sum Int))
 runabSearch b c = runAI c (absearch b)
 
 
@@ -88,8 +92,14 @@ callCutoff b r = do
   if cf b r then evalfun >>= \f -> return (f b)
             else mzero
 
+increment :: (MonadState w m, Monoid w) => w -> m ()
+increment a = do
+  w <- get
+  put $! w `mappend` a
+
 maxSearch :: Int -> Int -> Board -> AI (Board, Score)
 maxSearch aa bb b = do
+  increment (Sum 1) 
   let report = expand b
       list = fromOngoing report
   (callCutoff b report >>= (\s -> return (b,s)))  `mplus` maxSearch' aa bb list b
@@ -110,6 +120,7 @@ fromOngoing _ = []
 
 minSearchS :: Int -> Int -> Board -> AI Score 
 minSearchS aa bb b = do
+  increment (Sum 1)
   let report = expand b
       list = fromOngoing report
   callCutoff b report `mplus` minSearchS' aa bb list 
@@ -125,6 +136,8 @@ minSearchS' aa bb (h:rest) = do
 
 maxSearchS :: Int -> Int -> Board -> AI Score
 maxSearchS aa bb b = do
+--  liftIO (putStrLn "expanding board" >> print b)
+  increment (Sum 1)
   let report = expand b
       list = fromOngoing report
   callCutoff b report `mplus` maxSearchS' aa bb list

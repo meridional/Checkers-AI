@@ -2,8 +2,9 @@ module Main where
 import System.IO
 import Checkers
 import AlphaBeta
-import Data.Maybe
+--import Data.Maybe
 import qualified Data.Set as Set
+import Data.Monoid
 --import qualified Data.Text.Lazy as Text
 
 basicCutoff :: Int -> Cutoff
@@ -31,11 +32,13 @@ kingEval b = Set.foldl f 0 (redps b) + Set.foldl f 0 (blackps b)
         f a (Pawn _ Black) = a - 1
         f a _ = a + 1
   
-minmax :: Int ->  Board -> Decision
-minmax x b = fromJust $ runabSearch b (True, basicCutoff x, kingEval) 
+--minmax :: Int ->  Board -> Decision
+minmax :: Int -> Board -> IO (Either String (Decision, Data.Monoid.Sum Int))
+minmax x b =  runabSearch b (True, basicCutoff x, kingEval) 
 
-alphabeta :: Int -> Board -> Decision
-alphabeta x b = fromJust $ runabSearch b (True, nojumpCutoff x, kingEval)
+--alphabeta :: Int -> Board -> Decision
+alphabeta :: Int -> Board -> IO (Either String (Decision, Data.Monoid.Sum Int))
+alphabeta x b =  runabSearch b (True, nojumpCutoff x, kingEval)
 
 
 main ::  IO ()
@@ -48,8 +51,9 @@ main = do
   pcs <- fmap (map makePiece . lines) $ hGetContents h
   let bo = makeBoard b pcs
   print bo
-  let d = alphabeta x bo 
+  d <- alphabeta x bo 
+  print d
 --  print $ expand bo
   putStrLn "----------------"
   --putStrLn $ Text.unpack . snd $ d
-  print  d
+  --d

@@ -3,14 +3,15 @@ module Checkers where
 --import Control.Concurrent
 import Control.Monad.Reader
 --import Data.Maybe
-import Data.List (find, intersperse , sortBy)
+import Data.List (find, intersperse) --, sortBy)
 import qualified Data.Set as Set
 import System.IO
-import Data.Ord 
+--import Data.Ord 
 
 type Tile = (Int, Int)
 
-compTile :: (Int , Int ) -> (Int, Int) -> Ordering
+
+compTile :: (Int , Int) -> (Int, Int) -> Ordering
 compTile (x,y) (a,b)
   | x == a = y `compare` b
   | otherwise = x `compare` a
@@ -44,9 +45,11 @@ instance Show Board where
      where
       pcs = Set.toList (redps b) ++ Set.toList (blackps b)
       format n = show n ++ map (format' n) [1..8]
-      format' y x = case find (\p -> pos p == (x,y)) pcs of
+      format' y x 
+        | even (y + x) = '.'
+        | otherwise = case find (\p -> pos p == (x,y)) pcs of
                          Just k -> piece2Char k
-                         Nothing -> '+'
+                         Nothing -> '.'
 
 piece2Char :: Piece -> Char
 piece2Char (Pawn _ Red) = 'r'
@@ -116,6 +119,7 @@ emptyTile' :: Board -> Tile -> Bool
 emptyTile' b t = emptyTile b (genericPieceOnTile t Red) && emptyTile b (genericPieceOnTile t Black)
 
 paces :: Piece -> Board -> [Board]
+
 paces p b = do
   t <- filter (emptyTile' b) $ neighboringSteps p
   return $ commitPace p t b

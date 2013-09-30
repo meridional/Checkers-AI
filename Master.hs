@@ -2,6 +2,7 @@ module Main where
 import System.IO
 import Checkers
 import AlphaBeta
+import Training
 --import Control.Monad.Trans.Maybe
 --import Data.Maybe
 import qualified Data.Set as Set
@@ -112,4 +113,5 @@ main = do
 --  print $ expand bo
   let evalA = (True, nojumpCutoff 10, kingEval 6)
       evalB = (True, nojumpCutoff x, \b -> 5 * (kingEval 5 b) + offenceEval b + defenceOnTheSideEval b)
-  gameOn bo (evalA, evalB)
+  --gameOn bo (evalA, evalB)
+  print $ runTraining ((basicCutoff 10, kingEval 5),(basicCutoff 10, basicEval)) (simulate bo)

@@ -77,8 +77,8 @@ callCutoff _ _ (EndGame Black) =  return (negate 999)
 callCutoff _ _ (EndGame Red) =  return 999
 callCutoff i b r = do
   cf <- cutofffun
-  if cf i b r then evalfun >>= \f -> return (f b)
-              else mzero
+  if even i && cf i b r then evalfun >>= \f -> return (f b)
+                        else mzero
 
 increment :: (MonadState w m, Monoid w) => w -> m ()
 increment a = do
@@ -156,6 +156,3 @@ maxSearchS' d aa bb (h:rest) = do
   pruning <- pruneOrNot
   if bb <= aa' && pruning then return aa'
             else maxSearchS' d aa' bb rest 
-
-
-

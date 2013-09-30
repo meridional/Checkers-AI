@@ -23,18 +23,25 @@ nojumpCutoff x d b (Ongoing (h:_))
   | Set.size (opposingPieces b) > Set.size (playingPieces h) = False
   | otherwise = True
 
+dynamicNoJumpCutoff :: Int -> Cutoff
+dynamicNoJumpCutoff _ _ _ (EndGame _) = True
+dynamicNoJumpCutoff x d b (Ongoing (h:_)) 
+  | d <=  (12 * x `div` (Set.size (playingPieces b)+3)) = False
+  | Set.size (opposingPieces b) > Set.size (playingPieces h) = False
+  | otherwise = True
+
+
 basicEval :: Eval
 basicEval b = Set.size r - Set.size bl
   where r =  redps b
         bl = blackps b
 
-kingEval :: Eval
-kingEval b = Set.foldl' f 0 (redps b) + Set.foldl' g 0 (blackps b)
+kingEval ::Int -> Eval
+kingEval kingVal b = Set.foldl' f 0 (redps b) + Set.foldl' g 0 (blackps b)
   where f a (King _ _) = a + kingVal
         f a _ = a + pawnVal
         g a (King _ _) = a - kingVal
         g a _ = a - pawnVal 
-        kingVal = 5
         pawnVal = 1
 
 offenceEval :: Eval
@@ -70,15 +77,17 @@ moveCountEval b = score b + score (flipBoard b)
   
 --minmax :: Int ->  Board -> Decision
 minmax :: Int -> Board -> IO (Either String (Decision, Data.Monoid.Sum Int))
-minmax x b =  runabSearch b (False, basicCutoff x, kingEval) 
+minmax x b =  runabSearch b (False, basicCutoff x, basicEval) 
 
 --alphabeta :: Int -> Board -> Decision
 alphabeta :: Int -> Board -> IO (Either String (Decision, Data.Monoid.Sum Int))
-alphabeta x b =  runabSearch b (True, nojumpCutoff x, kingEval)
+alphabeta x b =  runabSearch b (True, nojumpCutoff x, kingEval 5)
 
 gameOn :: Board -> (AIConfig, AIConfig) -> IO ()
 gameOn b (fstc, sndc) = do
-   Right (d, _) <- runabSearch b fstc
+   Right (d, Sum n) <- runabSearch b fstc
+   putStrLn "----------------------"
+   putStrLn $ show n ++ " nodes visited"
    case d of 
         Ended _ -> print d
         Next b' -> do
@@ -89,8 +98,6 @@ gameOn b (fstc, sndc) = do
             print b'
             gameOn b' (sndc, fstc)
 
-
-
 main ::  IO ()
 main = do
 --  h <- openFile "test5" ReadMode
@@ -100,14 +107,9 @@ main = do
   b <-  hGetLine h
   pcs <- fmap (map makePiece . lines) $ hGetContents h
   let bo = makeBoard b pcs
+  putStrLn "Initial Board:"
   print bo
 --  print $ expand bo
-  putStrLn "----------------"
-  let evalA = (True, nojumpCutoff x, \bb -> 3 * kingEval bb + defenceOnTheSideEval bb + offenceEval bb)
-      evalB = (True, nojumpCutoff 10, kingEval)
-  gameOn bo (evalB, evalA)
-  --d <- alphabeta x bo 
- -- print d
---  print $ expand bo
-  --putStrLn $ Text.unpack . snd $ d
-  --d
+  let evalA = (True, nojumpCutoff 10, kingEval 6)
+      evalB = (True, nojumpCutoff x, \b -> 5 * (kingEval 5 b) + offenceEval b + defenceOnTheSideEval b)
+  gameOn bo (evalA, evalB)

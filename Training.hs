@@ -9,16 +9,19 @@ module Training where
 import Checkers
 --import Control.Monad
 import Control.Monad.Reader
---import Control.Monad.Maybe
-import Control.Monad.Identity
+--import Control.Monad.Trans
+--import Control.Monad.Identity
 import AlphaBeta
 import Data.List (foldl1')
+import Control.Monad.State
+import Data.Monoid
+
 
 type Training a = 
-   ReaderT ((Cutoff,Eval),(Cutoff,Eval)) Identity a
+   ReaderT ((Cutoff,Eval),(Cutoff,Eval)) (State (Sum Int)) a
 
-runTraining :: ((Cutoff,Eval),(Cutoff,Eval)) -> Training a -> a
-runTraining c x = runIdentity (runReaderT x c)
+runTraining :: ((Cutoff,Eval),(Cutoff,Eval)) -> Training a -> (a, Sum Int)
+runTraining c x = runState (runReaderT x c) (Sum 0) 
 
 currentTrio :: Board -> Training (Cutoff, Eval, Int -> Int -> Bool)
 currentTrio bo
@@ -57,6 +60,7 @@ generalEval (Next x) e = e x
 
 maxTrain :: Int -> Board -> Training Decision
 maxTrain d b = do
+  increment (Sum 1)
   let r = expand b
       l = fromOngoing r
   de <- callCutoffFun d b r
@@ -64,12 +68,13 @@ maxTrain d b = do
        Nothing -> do
          ds <- mapM (minTrain (d + 1)) l
          e <- asks (snd . fst)
-         return $ pick ds (flip generalEval e) (>)
+         return $ pick ds (`generalEval` e) (>)
        Just x -> return x
 
 
 minTrain :: Int -> Board -> Training Decision
 minTrain d b = do
+  increment (Sum 1)
   let r = expand b
       l = fromOngoing r
   de <- callCutoffFun d b r
@@ -77,5 +82,5 @@ minTrain d b = do
        Nothing -> do
          ds <- mapM (maxTrain (d + 1)) l
          e <- asks (snd . snd)
-         return $ pick ds (flip generalEval e) (<)
+         return $ pick ds (`generalEval` e) (<)
        Just x -> return x

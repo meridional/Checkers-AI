@@ -99,6 +99,18 @@ gameOn b (fstc, sndc) = do
             print b'
             gameOn b' (sndc, fstc)
 
+type Reflection = Board -> Decision
+gameOn' :: Board -> (Reflection, Reflection) -> IO ()
+gameOn' b (f,s) = do
+    let b' = f b
+    case b' of
+      Ended _ -> print b'
+      Next x -> putStrLn (show (playing b) ++ " plays:" ) >>
+                     print x >> gameOn' x (s,f)
+
+makeTrainingDuo :: Cutoff -> Eval -> Eval -> (Reflection,Reflection)
+makeTrainingDuo c e1 e2 = (fst . runTraining ((c, e1), (c, e2)) . simulate, fst . runTraining ((c,e2),(c,e1)) . simulate )
+
 main ::  IO ()
 main = do
 --  h <- openFile "test5" ReadMode
@@ -114,4 +126,5 @@ main = do
   let evalA = (True, nojumpCutoff 10, kingEval 6)
       evalB = (True, nojumpCutoff x, \b -> 5 * (kingEval 5 b) + offenceEval b + defenceOnTheSideEval b)
   --gameOn bo (evalA, evalB)
-  print $ runTraining ((basicCutoff 10, kingEval 5),(basicCutoff 10, basicEval)) (simulate bo)
+  let duo = makeTrainingDuo (basicCutoff 5) (kingEval 5) basicEval
+  gameOn' bo duo 

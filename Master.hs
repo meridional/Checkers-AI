@@ -27,7 +27,7 @@ nojumpCutoff x d b (Ongoing (h:_))
 dynamicNoJumpCutoff :: Int -> Cutoff
 dynamicNoJumpCutoff _ _ _ (EndGame _) = True
 dynamicNoJumpCutoff x d b (Ongoing (h:_)) 
-  | d <=  (12 * x `div` (Set.size (playingPieces b)+3)) = False
+  | d <=  (12 * x `div` (Set.size (playingPieces b)+6)) = False
   | Set.size (opposingPieces b) > Set.size (playingPieces h) = False
   | otherwise = True
 
@@ -85,7 +85,10 @@ alphabeta :: Int -> Board -> IO (Either String (Decision, Data.Monoid.Sum Int))
 alphabeta x b =  runabSearch b (True, nojumpCutoff x, kingEval 5)
 
 gameOn :: Board -> (AIConfig, AIConfig) -> IO ()
-gameOn b (fstc, sndc) = do
+gameOn b (fstc, sndc) 
+ | roundNumber b > steps = putStrLn $ show steps ++ " has been reached.\n"
+ | otherwise = do
+   putStrLn "Alpha-beta pruning"
    Right (d, Sum n) <- runabSearch b fstc
    putStrLn "----------------------"
    putStrLn $ show n ++ " nodes visited"
@@ -99,10 +102,17 @@ gameOn b (fstc, sndc) = do
             print b'
             gameOn b' (sndc, fstc)
 
+steps :: Int
+steps = 80 
+
 type Reflection = Board -> Decision
 gameOn' :: Board -> (Reflection, Reflection) -> IO ()
-gameOn' b (f,s) = do
+gameOn' b (f,s)
+ | roundNumber b == steps = putStrLn $ show steps ++ " has been reached.\n"
+ | otherwise = do
+    putStrLn "MINMAX strategy"
     let b' = f b
+    putStrLn $ "Turn " ++ show (roundNumber b) ++ ":"
     case b' of
       Ended _ -> print b'
       Next x -> putStrLn (show (playing b) ++ " plays:" ) >>
@@ -123,8 +133,9 @@ main = do
   putStrLn "Initial Board:"
   print bo
 --  print $ expand bo
-  let evalA = (True, nojumpCutoff 10, kingEval 6)
-      evalB = (True, nojumpCutoff x, \b -> 5 * (kingEval 5 b) + offenceEval b + defenceOnTheSideEval b)
-  --gameOn bo (evalA, evalB)
-  let duo = makeTrainingDuo (basicCutoff 5) (kingEval 5) basicEval
-  gameOn' bo duo 
+  let evalA = (True, basicCutoff 8, kingEval 5)
+      evalB = (True, dynamicNoJumpCutoff 1, kingEval 1)
+  gameOn bo (evalA, evalB)
+  let duo = makeTrainingDuo (dynamicNoJumpCutoff 6) (kingEval 2) (kingEval 5)
+  --gameOn' bo duo
+  return ()

@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Training where
 
 -- training module
@@ -59,7 +60,7 @@ generalEval (Ended _ ) _ = 999
 generalEval (Next x) e = e x
 
 maxTrain :: Int -> Board -> Training Decision
-maxTrain d b = do
+maxTrain d !b = do
   increment (Sum 1)
   let r = expand b
       l = fromOngoing r
@@ -73,7 +74,7 @@ maxTrain d b = do
 
 
 minTrain :: Int -> Board -> Training Decision
-minTrain d b = do
+minTrain d !b = do
   increment (Sum 1)
   let r = expand b
       l = fromOngoing r
